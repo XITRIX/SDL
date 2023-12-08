@@ -463,11 +463,19 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
     SDL_AddHintCallback(SDL_HINT_IDLE_TIMER_DISABLED,
                         SDL_IdleTimerDisabledChanged, NULL);
 
+    if (@available(iOS 15.0, *)) {
+        CADisplayLink* displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(fpsUnlocker)];
+        displayLink.preferredFrameRateRange = CAFrameRateRangeMake(80, 120, 120);
+        [displayLink addToRunLoop:NSRunLoop.currentRunLoop forMode:NSDefaultRunLoopMode];
+    }
+
     SDL_SetMainReady();
     [self performSelector:@selector(postFinishLaunch) withObject:nil afterDelay:0.0];
 
     return YES;
 }
+
+- (void)fpsUnlocker {}
 
 - (UIWindow *)window
 {

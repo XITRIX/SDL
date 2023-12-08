@@ -34,7 +34,7 @@
 #include "SDL_loadso.h"
 #include <dlfcn.h>
 
-@interface SDLEAGLContext : EAGLContext
+@interface SDLEAGLContext : MGLContext
 
 /* The OpenGL ES context owns a view / drawable. */
 @property (nonatomic, strong) SDL_uikitopenglview *sdlView;
@@ -68,7 +68,7 @@ int UIKit_GL_MakeCurrent(_THIS, SDL_Window * window, SDL_GLContext context)
     @autoreleasepool {
         SDLEAGLContext *eaglcontext = (__bridge SDLEAGLContext *) context;
 
-        if (![EAGLContext setCurrentContext:eaglcontext]) {
+        if (![MGLContext setCurrentContext:eaglcontext forLayer:(MGLLayer*)eaglcontext.sdlView.layer]) {
             return SDL_SetError("Could not make EAGL context current");
         }
 
@@ -135,7 +135,7 @@ SDL_GLContext UIKit_GL_CreateContext(_THIS, SDL_Window * window)
         SDL_uikitopenglview *view;
         SDL_WindowData *data = (__bridge SDL_WindowData *) window->driverdata;
         CGRect frame = UIKit_ComputeViewFrame(window, data.uiwindow.screen);
-        EAGLSharegroup *sharegroup = nil;
+        MGLSharegroup *sharegroup = nil;
         CGFloat scale = 1.0;
         int samples = 0;
         int major = _this->gl_config.major_version;
@@ -143,7 +143,7 @@ SDL_GLContext UIKit_GL_CreateContext(_THIS, SDL_Window * window)
 
         /* The EAGLRenderingAPI enum values currently map 1:1 to major GLES
          * versions. */
-        EAGLRenderingAPI api = major;
+        MGLRenderingAPI api = major;
 
         /* iOS currently doesn't support GLES >3.0. */
         if (major > 3 || (major == 3 && minor > 0)) {
@@ -156,8 +156,8 @@ SDL_GLContext UIKit_GL_CreateContext(_THIS, SDL_Window * window)
         }
 
         if (_this->gl_config.share_with_current_context) {
-            EAGLContext *currContext = (__bridge EAGLContext *) SDL_GL_GetCurrentContext();
-            sharegroup = currContext.sharegroup;
+            MGLContext *context = (__bridge MGLContext *) SDL_GL_GetCurrentContext();
+            sharegroup = context.sharegroup;
         }
 
         if (window->flags & SDL_WINDOW_ALLOW_HIGHDPI) {
@@ -168,9 +168,10 @@ SDL_GLContext UIKit_GL_CreateContext(_THIS, SDL_Window * window)
         }
 
         context = [[SDLEAGLContext alloc] initWithAPI:api sharegroup:sharegroup];
-        if (!context) {
+        
+        if (!context || ![MGLContext setCurrentContext:context]) {
             SDL_SetError("OpenGL ES %d context could not be created", _this->gl_config.major_version);
-            return NULL;
+            return nil;
         }
 
         /* construct our view, passing in SDL's OpenGL configuration data */
@@ -225,9 +226,9 @@ void UIKit_GL_RestoreCurrentContext(void)
          finished running its own code for the frame. If this isn't done, the
          app may crash or have other nasty symptoms when Dictation is used.
          */
-        EAGLContext *context = (__bridge EAGLContext *) SDL_GL_GetCurrentContext();
-        if (context != NULL && [EAGLContext currentContext] != context) {
-            [EAGLContext setCurrentContext:context];
+        MGLContext *context = (__bridge MGLContext *) SDL_GL_GetCurrentContext();
+        if (context != NULL && [MGLContext currentContext] != context) {
+            [MGLContext setCurrentContext:context];
         }
     }
 }

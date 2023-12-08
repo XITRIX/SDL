@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 52;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -9808,6 +9808,13 @@
 				CLANG_LINK_OBJC_RUNTIME = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = GLES_SILENCE_DEPRECATION;
 				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				HEADER_SEARCH_PATHS = (
+					/usr/X11R6/include,
+					"$(VULKAN_SDK)/include",
+					../../src/video/khronos,
+					../../src/hidapi/hidapi,
+					"\"$(SRCROOT)/../../../angle/ios/MetalANGLE.framework/Headers\"",
+				);
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
 			};
@@ -9820,6 +9827,13 @@
 				CLANG_LINK_OBJC_RUNTIME = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = GLES_SILENCE_DEPRECATION;
 				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				HEADER_SEARCH_PATHS = (
+					/usr/X11R6/include,
+					"$(VULKAN_SDK)/include",
+					../../src/video/khronos,
+					../../src/hidapi/hidapi,
+					"\"$(SRCROOT)/../../../angle/ios/MetalANGLE.framework/Headers\"",
+				);
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
 			};
