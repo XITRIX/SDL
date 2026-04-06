@@ -49,8 +49,14 @@
                         scale:(CGFloat)scale
 {
     if ((self = [super initWithFrame:frame])) {
+        CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
+
         self.tag = SDL_METALVIEW_TAG;
+        self.opaque = NO;
+        self.backgroundColor = UIColor.clearColor;
         self.layer.contentsScale = scale;
+        metalLayer.opaque = NO;
+        metalLayer.backgroundColor = UIColor.clearColor.CGColor;
         [self updateDrawableSize];
     }
 
@@ -86,7 +92,11 @@ SDL_MetalView UIKit_Metal_CreateView(_THIS, SDL_Window * window)
          * dimensions of the screen rather than the dimensions in points
          * yielding high resolution on retine displays.
          */
+#if !TARGET_OS_XR
         scale = data.uiwindow.screen.nativeScale;
+#else
+        scale = 2.0;
+#endif
     }
 
     metalview = [[SDL_uikitmetalview alloc] initWithFrame:data.uiwindow.bounds

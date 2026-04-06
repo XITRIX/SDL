@@ -175,20 +175,21 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
 
 - (void)startAnimation
 {
-#ifdef __IPHONE_10_3
-    SDL_WindowData *data;
-#endif
-
     displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(doLoop:)];
 
 #ifdef __IPHONE_10_3
-    data = (__bridge SDL_WindowData *) window->driverdata;
-
+#if !TARGET_OS_XR
+    SDL_WindowData *data = (__bridge SDL_WindowData *) window->driverdata;
     if ([displayLink respondsToSelector:@selector(preferredFramesPerSecond)]
         && data != nil && data.uiwindow != nil
         && [data.uiwindow.screen respondsToSelector:@selector(maximumFramesPerSecond)]) {
         displayLink.preferredFramesPerSecond = data.uiwindow.screen.maximumFramesPerSecond / animationInterval;
     } else
+#else
+    if ([displayLink respondsToSelector:@selector(preferredFramesPerSecond)]) {
+        displayLink.preferredFramesPerSecond = 90 / animationInterval;
+    } else
+#endif
 #endif
     {
 #if __IPHONE_OS_VERSION_MIN_REQUIRED < 100300
@@ -531,7 +532,11 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
 
     CGAffineTransform t = self.view.transform;
     CGPoint offset = CGPointMake(0.0, 0.0);
+#if TARGET_OS_XR
+    CGRect frame = UIKit_ComputeViewFrame(window);
+#else
     CGRect frame = UIKit_ComputeViewFrame(window, data.uiwindow.screen);
+#endif
 
     if (self.keyboardHeight) {
         int rectbottom = self.textInputRect.y + self.textInputRect.h;

@@ -34,9 +34,9 @@ int SDL_SYS_OpenURL(const char *url)
         if (@available(iOS 10.0, tvOS 10.0, *)) {
             [[UIApplication sharedApplication] openURL:nsurl options:@{} completionHandler:^(BOOL success) {}];
         } else {
-            #ifndef SDL_PLATFORM_VISIONOS   /* Fallback is never available in any version of VisionOS (but correct API always is). */
+#if !TARGET_OS_XR
             [[UIApplication sharedApplication] openURL:nsurl];
-            #endif
+#endif
         }
         return 0;
     }

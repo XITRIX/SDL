@@ -134,7 +134,11 @@ SDL_GLContext UIKit_GL_CreateContext(_THIS, SDL_Window * window)
         SDLEAGLContext *context = nil;
         SDL_uikitopenglview *view;
         SDL_WindowData *data = (__bridge SDL_WindowData *) window->driverdata;
+#if TARGET_OS_XR
+        CGRect frame = UIKit_ComputeViewFrame(window);
+#else
         CGRect frame = UIKit_ComputeViewFrame(window, data.uiwindow.screen);
+#endif
         EAGLSharegroup *sharegroup = nil;
         CGFloat scale = 1.0;
         int samples = 0;
@@ -164,7 +168,11 @@ SDL_GLContext UIKit_GL_CreateContext(_THIS, SDL_Window * window)
             /* Set the scale to the natural scale factor of the screen - the
              * backing dimensions of the OpenGL view will match the pixel
              * dimensions of the screen rather than the dimensions in points. */
+#if !TARGET_OS_XR
             scale = data.uiwindow.screen.nativeScale;
+#else
+            scale = 2.0;
+#endif
         }
 
         context = [[SDLEAGLContext alloc] initWithAPI:api sharegroup:sharegroup];
