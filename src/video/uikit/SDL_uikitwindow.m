@@ -69,6 +69,7 @@
 
 - (void)layoutSubviews
 {
+#if !TARGET_OS_XR
     /* Workaround to fix window orientation issues in iOS 8. */
     /* As of July 1 2019, I haven't been able to reproduce any orientation
      * issues with this disabled on iOS 12. The issue this is meant to fix might
@@ -78,6 +79,7 @@
     if (!UIKit_IsSystemVersionAtLeast(9.0)) {
         self.frame = self.screen.bounds;
     }
+#endif
     [super layoutSubviews];
 }
 
@@ -90,7 +92,11 @@ static int SetupWindowData(_THIS, SDL_Window *window, UIWindow *uiwindow, SDL_bo
     SDL_DisplayData *displaydata = (__bridge SDL_DisplayData *) display->driverdata;
     SDL_uikitview *view;
 
+#if TARGET_OS_XR
+    CGRect frame = UIKit_ComputeViewFrame(window);
+#else
     CGRect frame = UIKit_ComputeViewFrame(window, displaydata.uiscreen);
+#endif
     int width  = (int) frame.size.width;
     int height = (int) frame.size.height;
 
@@ -106,13 +112,15 @@ static int SetupWindowData(_THIS, SDL_Window *window, UIWindow *uiwindow, SDL_bo
     /* only one window on iOS, always shown */
     window->flags &= ~SDL_WINDOW_HIDDEN;
 
+#if !TARGET_OS_XR
     if (displaydata.uiscreen != [UIScreen mainScreen]) {
         window->flags &= ~SDL_WINDOW_RESIZABLE;  /* window is NEVER resizable */
         window->flags &= ~SDL_WINDOW_INPUT_FOCUS;  /* never has input focus */
         window->flags |= SDL_WINDOW_BORDERLESS;  /* never has a status bar. */
     }
+#endif
 
-#if !TARGET_OS_TV
+#if !TARGET_OS_TV && !TARGET_OS_XR
     if (displaydata.uiscreen == [UIScreen mainScreen]) {
         /* SDL_CreateWindow sets the window w&h to the display's bounds if the
          * fullscreen flag is set. But the display bounds orientation might not
@@ -133,7 +141,7 @@ static int SetupWindowData(_THIS, SDL_Window *window, UIWindow *uiwindow, SDL_bo
             height = temp;
         }
     }
-#endif /* !TARGET_OS_TV */
+#endif /* !TARGET_OS_TV && !TARGET_OS_XR */
 
 #if 0 /* Don't set the x/y position, it's already placed on a display */
     window->x = 0;
@@ -174,7 +182,7 @@ int UIKit_CreateWindow(_THIS, SDL_Window *window)
         /* If monitor has a resolution of 0x0 (hasn't been explicitly set by the
          * user, so it's in standby), try to force the display to a resolution
          * that most closely matches the desired window size. */
-#if !TARGET_OS_TV
+#if !TARGET_OS_TV && !TARGET_OS_XR
         const CGSize origsize = data.uiscreen.currentMode.size;
         if ((origsize.width == 0.0f) && (origsize.height == 0.0f)) {
             if (display->num_display_modes == 0) {
@@ -208,16 +216,24 @@ int UIKit_CreateWindow(_THIS, SDL_Window *window)
                 [UIApplication sharedApplication].statusBarHidden = NO;
             }
         }
-#endif /* !TARGET_OS_TV */
+#endif /* !TARGET_OS_TV && !TARGET_OS_XR */
 
         /* ignore the size user requested, and make a fullscreen window */
         /* !!! FIXME: can we have a smaller view? */
+#if TARGET_OS_XR
+        CGFloat width = window->w > 0 ? window->w : SDL_XR_SCREENWIDTH;
+        CGFloat height = window->h > 0 ? window->h : SDL_XR_SCREENHEIGHT;
+        UIWindow *uiwindow = [[SDL_uikitwindow alloc] initWithFrame:CGRectMake(0, 0, width, height)];
+#else
         UIWindow *uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
+#endif
 
         /* put the window on an external display if appropriate. */
+#if !TARGET_OS_XR
         if (data.uiscreen != [UIScreen mainScreen]) {
             [uiwindow setScreen:data.uiscreen];
         }
+#endif
 
         if (SetupWindowData(_this, window, uiwindow, SDL_TRUE) < 0) {
             return -1;
@@ -244,10 +260,14 @@ void UIKit_ShowWindow(_THIS, SDL_Window * window)
         /* Make this window the current mouse focus for touch input */
         SDL_VideoDisplay *display = SDL_GetDisplayForWindow(window);
         SDL_DisplayData *displaydata = (__bridge SDL_DisplayData *) display->driverdata;
+#if !TARGET_OS_XR
         if (displaydata.uiscreen == [UIScreen mainScreen]) {
+#endif
             SDL_SetMouseFocus(window);
             SDL_SetKeyboardFocus(window);
+#if !TARGET_OS_XR
         }
+#endif
     }
 }
 
@@ -273,7 +293,7 @@ static void UIKit_UpdateWindowBorder(_THIS, SDL_Window * window)
     SDL_WindowData *data = (__bridge SDL_WindowData *) window->driverdata;
     SDL_uikitviewcontroller *viewcontroller = data.viewcontroller;
 
-#if !TARGET_OS_TV
+#if !TARGET_OS_TV && !TARGET_OS_XR
     if (data.uiwindow.screen == [UIScreen mainScreen]) {
         if (window->flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS)) {
             [UIApplication sharedApplication].statusBarHidden = YES;
@@ -286,7 +306,9 @@ static void UIKit_UpdateWindowBorder(_THIS, SDL_Window * window)
 
     /* Update the view's frame to account for the status bar change. */
     viewcontroller.view.frame = UIKit_ComputeViewFrame(window, data.uiwindow.screen);
-#endif /* !TARGET_OS_TV */
+#else
+    viewcontroller.view.frame = UIKit_ComputeViewFrame(window);
+#endif /* !TARGET_OS_TV && !TARGET_OS_XR */
 
 #ifdef SDL_IPHONE_KEYBOARD
     /* Make sure the view is offset correctly when the keyboard is visible. */
@@ -370,7 +392,11 @@ void UIKit_GetWindowSizeInPixels(_THIS, SDL_Window * window, int *w, int *h)
     CGFloat scale = 1.0;
 
     if (window->flags & SDL_WINDOW_ALLOW_HIGHDPI) {
+#if !TARGET_OS_XR
         scale = windata.uiwindow.screen.nativeScale;
+#else
+        scale = 2.0;
+#endif
     }
 
     /* Integer truncation of fractional values matches SDL_uikitmetalview and

@@ -26,7 +26,7 @@
 
 #include "SDL_touch.h"
 
-#if TARGET_OS_TV
+#if TARGET_OS_TV || TARGET_OS_XR
 #import <GameController/GameController.h>
 #define SDLRootViewController GCEventViewController
 #else

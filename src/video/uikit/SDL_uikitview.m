@@ -34,6 +34,10 @@
 #include "SDL_uikitmodes.h"
 #include "SDL_uikitwindow.h"
 
+#if TARGET_OS_XR
+#import <GameController/GameController.h>
+#endif
+
 /* The maximum number of mouse buttons we support */
 #define MAX_MOUSE_BUTTONS    5
 
@@ -80,6 +84,14 @@ extern int SDL_AppleTVRemoteOpenedAsJoystick;
 #if !TARGET_OS_TV
         self.multipleTouchEnabled = YES;
         SDL_AddTouch(directTouchId, SDL_TOUCH_DEVICE_DIRECT, "");
+#endif
+
+#if TARGET_OS_XR
+        if (@available(visionOS 2.0, *)) {
+            GCEventInteraction *interaction = [[GCEventInteraction alloc] init];
+            interaction.handledEventTypes = GCUIEventTypeGamepad;
+            [self addInteraction:interaction];
+        }
 #endif
 
 #if !TARGET_OS_TV && defined(__IPHONE_13_4)

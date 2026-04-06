@@ -55,7 +55,9 @@ static void UIKit_VideoQuit(_THIS);
 static void UIKit_DeleteDevice(SDL_VideoDevice * device)
 {
     @autoreleasepool {
-        CFRelease(device->driverdata);
+        if (device->driverdata) {
+            CFRelease(device->driverdata);
+        }
         SDL_free(device);
     }
 }
@@ -192,6 +194,12 @@ SDL_bool UIKit_IsSystemVersionAtLeast(double version)
     return [[UIDevice currentDevice].systemVersion doubleValue] >= version;
 }
 
+#if TARGET_OS_XR
+CGRect UIKit_ComputeViewFrame(SDL_Window *window)
+{
+    return CGRectMake(0, 0, window->w, window->h);
+}
+#else
 CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
 {
     SDL_WindowData *data = (__bridge SDL_WindowData *) window->driverdata;
@@ -229,6 +237,7 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
 
     return frame;
 }
+#endif
 
 void UIKit_ForceUpdateHomeIndicator()
 {

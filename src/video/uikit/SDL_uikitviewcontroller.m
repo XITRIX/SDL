@@ -149,7 +149,9 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
 {
     displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(doLoop:)];
 
-#ifdef __IPHONE_10_3
+#if TARGET_OS_XR
+    displayLink.preferredFramesPerSecond = 90 / animationInterval;
+#elif defined(__IPHONE_10_3)
     SDL_WindowData *data = (__bridge SDL_WindowData *) window->driverdata;
 
     if ([displayLink respondsToSelector:@selector(preferredFramesPerSecond)]
@@ -493,7 +495,11 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
 {
     CGAffineTransform t = self.view.transform;
     CGPoint offset = CGPointMake(0.0, 0.0);
+#if TARGET_OS_XR
+    CGRect frame = UIKit_ComputeViewFrame(window);
+#else
     CGRect frame = UIKit_ComputeViewFrame(window, self.view.window.screen);
+#endif
 
     if (self.keyboardHeight) {
         int rectbottom = self.textInputRect.y + self.textInputRect.h;
