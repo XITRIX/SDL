@@ -293,7 +293,8 @@ static void UIKit_UpdateWindowBorder(_THIS, SDL_Window * window)
     SDL_WindowData *data = (__bridge SDL_WindowData *) window->driverdata;
     SDL_uikitviewcontroller *viewcontroller = data.viewcontroller;
 
-#if !TARGET_OS_TV && !TARGET_OS_XR
+#if !TARGET_OS_XR
+#if !TARGET_OS_TV
     if (data.uiwindow.screen == [UIScreen mainScreen]) {
         if (window->flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS)) {
             [UIApplication sharedApplication].statusBarHidden = YES;
@@ -303,6 +304,7 @@ static void UIKit_UpdateWindowBorder(_THIS, SDL_Window * window)
 
         [viewcontroller setNeedsStatusBarAppearanceUpdate];
     }
+#endif
 
     /* Update the view's frame to account for the status bar change. */
     viewcontroller.view.frame = UIKit_ComputeViewFrame(window, data.uiwindow.screen);
