@@ -213,20 +213,40 @@ int UIKit_CreateWindow(_THIS, SDL_Window *window)
         }
 #endif /* !TARGET_OS_TV && !TARGET_OS_XR */
 
-        /* ignore the size user requested, and make a fullscreen window */
-        /* !!! FIXME: can we have a smaller view? */
+        uiwindow = nil;
+
+        if (@available(iOS 13.0, tvOS 13.0, *)) {
+            UIWindowScene *scene = UIKit_GetActiveWindowScene();
+            if (scene) {
+                uiwindow = [[SDL_uikitwindow alloc] initWithWindowScene:scene];
 #if TARGET_OS_XR
-        CGFloat width = window->w > 0 ? window->w : SDL_XR_SCREENWIDTH;
-        CGFloat height = window->h > 0 ? window->h : SDL_XR_SCREENHEIGHT;
-    uiwindow = [[SDL_uikitwindow alloc] initWithFrame:CGRectMake(0, 0, width, height)];
-#else
-        uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
+                CGFloat width = window->w > 0 ? window->w : SDL_XR_SCREENWIDTH;
+                CGFloat height = window->h > 0 ? window->h : SDL_XR_SCREENHEIGHT;
+                uiwindow.frame = CGRectMake(0, 0, width, height);
 #endif
+            }
+        }
+
+        if (!uiwindow) {
+            /* ignore the size user requested, and make a fullscreen window */
+            /* !!! FIXME: can we have a smaller view? */
+#if TARGET_OS_XR
+            CGFloat width = window->w > 0 ? window->w : SDL_XR_SCREENWIDTH;
+            CGFloat height = window->h > 0 ? window->h : SDL_XR_SCREENHEIGHT;
+            uiwindow = [[SDL_uikitwindow alloc] initWithFrame:CGRectMake(0, 0, width, height)];
+#else
+            uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
+#endif
+        }
 
         /* put the window on an external display if appropriate. */
 #if !TARGET_OS_XR
         if (data.uiscreen != [UIScreen mainScreen]) {
-            [uiwindow setScreen:data.uiscreen];
+            if (@available(iOS 13.0, tvOS 13.0, *)) {
+                /* iOS 13+ uses UIWindowScene to manage screen association. */
+            } else {
+                [uiwindow setScreen:data.uiscreen];
+            }
         }
 #endif
 

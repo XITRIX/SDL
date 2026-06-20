@@ -66,7 +66,15 @@ int SDL_UIKitRunApp(int argc, char *argv[], SDL_main_func mainFunction)
 
     /* Give over control to run loop, SDLUIKitDelegate will handle most things from here */
     @autoreleasepool {
-        UIApplicationMain(argc, argv, nil, [SDLUIKitDelegate getAppDelegateClassName]);
+        NSString *name = nil;
+
+        if (@available(iOS 13.0, tvOS 13.0, *)) {
+            name = [SDLUIKitSceneDelegate getSceneDelegateClassName];
+        }
+        if (!name) {
+            name = [SDLUIKitDelegate getAppDelegateClassName];
+        }
+        UIApplicationMain(argc, argv, nil, name);
     }
 
     /* free the memory we used to hold copies of argc and argv */
@@ -358,6 +366,177 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
     return UIInterfaceOrientationMaskAll;
 }
 #endif /* !TARGET_OS_TV && !TARGET_OS_XR */
+
+@end
+
+API_AVAILABLE(ios(13.0), tvos(13.0))
+@implementation SDLUIKitSceneDelegate {
+    UIWindow *launchWindow;
+    NSMutableArray<NSURL *> *launchURLs;
+}
+
++ (NSString *)getSceneDelegateClassName
+{
+    return @"SDLUIKitSceneDelegate";
+}
+
+- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions
+{
+    if (![scene isKindOfClass:[UIWindowScene class]]) {
+        return;
+    }
+
+    UIWindowScene *windowScene = (UIWindowScene *)scene;
+    windowScene.delegate = self;
+
+    NSBundle *bundle = [NSBundle mainBundle];
+
+#ifdef SDL_IPHONE_LAUNCHSCREEN
+    UIViewController *vc = nil;
+    NSString *screenname = nil;
+
+#if !TARGET_OS_TV && !TARGET_OS_XR
+    screenname = [bundle objectForInfoDictionaryKey:@"UILaunchStoryboardName"];
+
+    if (screenname) {
+        @try {
+            UIStoryboard *storyboard = [UIStoryboard storyboardWithName:screenname bundle:bundle];
+            __auto_type storyboardVc = [storyboard instantiateInitialViewController];
+            vc = [[SDLLaunchStoryboardViewController alloc] initWithStoryboardViewController:storyboardVc];
+        }
+        @catch (NSException *exception) {
+            /* Do nothing (there's more code to execute below). */
+        }
+    }
+#endif
+
+    if (vc == nil) {
+        vc = [[SDLLaunchScreenController alloc] initWithNibName:screenname bundle:bundle];
+    }
+
+    if (vc.view) {
+#if TARGET_OS_XR
+        CGRect viewFrame = CGRectMake(0, 0, SDL_XR_SCREENWIDTH, SDL_XR_SCREENHEIGHT);
+#else
+        CGRect viewFrame = windowScene.coordinateSpace.bounds;
+#endif
+        launchWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
+        launchWindow.frame = viewFrame;
+
+        launchWindow.windowLevel = UIWindowLevelNormal + 1.0;
+        launchWindow.hidden = NO;
+        launchWindow.rootViewController = vc;
+    }
+#endif
+
+    /* Set working directory to resource path */
+    [[NSFileManager defaultManager] changeCurrentDirectoryPath:[bundle resourcePath]];
+
+    SDL_AddHintCallback(SDL_HINT_IDLE_TIMER_DISABLED,
+                        SDL_IdleTimerDisabledChanged, NULL);
+
+    launchURLs = [[NSMutableArray alloc] init];
+
+    for (NSUserActivity *activity in connectionOptions.userActivities) {
+        if (activity.webpageURL) {
+            [launchURLs addObject:activity.webpageURL];
+        }
+    }
+
+    for (UIOpenURLContext *urlContext in connectionOptions.URLContexts) {
+        [launchURLs addObject:urlContext.URL];
+    }
+
+    SDL_SetMainReady();
+    [self performSelector:@selector(postFinishLaunch) withObject:nil afterDelay:0.0];
+}
+
+- (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)URLContexts
+{
+    for (UIOpenURLContext *context in URLContexts) {
+        [self handleURL:context.URL];
+    }
+}
+
+- (void)sceneDidBecomeActive:(UIScene *)scene
+{
+    SDL_OnApplicationDidBecomeActive();
+}
+
+- (void)sceneWillResignActive:(UIScene *)scene
+{
+    SDL_OnApplicationWillResignActive();
+}
+
+- (void)sceneWillEnterForeground:(UIScene *)scene
+{
+    SDL_OnApplicationWillEnterForeground();
+}
+
+- (void)sceneDidEnterBackground:(UIScene *)scene
+{
+    SDL_OnApplicationDidEnterBackground();
+}
+
+- (void)handleURL:(NSURL *)url
+{
+    NSURL *fileURL = url.filePathURL;
+    if (fileURL != nil) {
+        SDL_SendDropFile(NULL, fileURL.path.UTF8String);
+    } else {
+        SDL_SendDropFile(NULL, url.absoluteString.UTF8String);
+    }
+    SDL_SendDropComplete(NULL);
+}
+
+- (void)hideLaunchScreen
+{
+    UIWindow *window = launchWindow;
+
+    if (!window || window.hidden) {
+        return;
+    }
+
+    launchWindow = nil;
+
+    [UIView animateWithDuration:0.2 animations:^{
+        window.alpha = 0.0;
+    } completion:^(BOOL finished) {
+        window.hidden = YES;
+        UIKit_ForceUpdateHomeIndicator();
+    }];
+}
+
+- (void)postFinishLaunch
+{
+    [self performSelector:@selector(hideLaunchScreen) withObject:nil afterDelay:0.0];
+    [self performSelector:@selector(processLaunchURLs) withObject:nil afterDelay:0.0];
+
+    SDL_iPhoneSetEventPump(SDL_TRUE);
+    exit_status = forward_main(forward_argc, forward_argv);
+    SDL_iPhoneSetEventPump(SDL_FALSE);
+
+    if (launchWindow) {
+        launchWindow.hidden = YES;
+        launchWindow = nil;
+    }
+}
+
+- (void)processLaunchURLs
+{
+    for (NSURL *url in launchURLs) {
+        [self handleURL:url];
+    }
+    launchURLs = nil;
+}
+
+- (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession options:(UISceneConnectionOptions *)options API_AVAILABLE(ios(13.0), tvos(13.0))
+{
+    /* This signals UIKit that SDL supports the UIScene lifecycle. */
+    UISceneConfiguration *config = [[UISceneConfiguration alloc] initWithName:@"SDLSceneConfiguration" sessionRole:connectingSceneSession.role];
+    config.delegateClass = [SDLUIKitSceneDelegate class];
+    return config;
+}
 
 @end
 

@@ -39,6 +39,8 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window);
 CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen);
 #endif
 
+extern UIWindowScene *UIKit_GetActiveWindowScene(void) API_AVAILABLE(ios(13.0), tvos(13.0));
+
 #endif /* __OBJC__ */
 
 void UIKit_SuspendScreenSaver(_THIS);

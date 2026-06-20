@@ -246,6 +246,39 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
 }
 #endif
 
+UIWindowScene *UIKit_GetActiveWindowScene(void)
+{
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        NSSet<UIScene *> *connectedScenes = [UIApplication sharedApplication].connectedScenes;
+
+        for (UIScene *scene in connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                if (windowScene.activationState == UISceneActivationStateForegroundActive) {
+                    return windowScene;
+                }
+            }
+        }
+
+        for (UIScene *scene in connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                if (windowScene.activationState == UISceneActivationStateForegroundInactive) {
+                    return windowScene;
+                }
+            }
+        }
+
+        for (UIScene *scene in connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]]) {
+                return (UIWindowScene *)scene;
+            }
+        }
+    }
+
+    return nil;
+}
+
 void UIKit_ForceUpdateHomeIndicator(void)
 {
 #if !TARGET_OS_TV
