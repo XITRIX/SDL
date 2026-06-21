@@ -226,7 +226,20 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
 
 - (void)viewDidLayoutSubviews
 {
-    const CGSize size = self.view.bounds.size;
+    CGSize size;
+
+#if TARGET_OS_XR
+    CGRect frame = UIKit_ComputeViewFrame(window);
+#else
+    SDL_WindowData *data = (__bridge SDL_WindowData *) window->driverdata;
+    CGRect frame = UIKit_ComputeViewFrame(window, data.uiwindow.screen);
+#endif
+
+    if (!CGRectEqualToRect(self.view.frame, frame)) {
+        self.view.frame = frame;
+    }
+
+    size = frame.size;
     int w = (int) size.width;
     int h = (int) size.height;
 

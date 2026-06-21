@@ -208,8 +208,12 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
     CGRect frame = screen.bounds;
 #if !TARGET_OS_TV
     UIInterfaceOrientation orient;
+    NSUInteger supportedOrientations;
     BOOL landscape;
+    BOOL supportsLandscape;
+    BOOL supportsPortrait;
     BOOL fullscreen;
+    BOOL forceOrientation;
 #endif
 
     /* Use the UIWindow bounds instead of the UIScreen bounds, when possible.
@@ -228,14 +232,18 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
      * https://bugzilla.libsdl.org/show_bug.cgi?id=3505
      * https://bugzilla.libsdl.org/show_bug.cgi?id=3465
      * https://forums.developer.apple.com/thread/65337 */
-    orient = [UIApplication sharedApplication].statusBarOrientation;
-    landscape = UIInterfaceOrientationIsLandscape(orient) ||
-                    !(UIKit_GetSupportedOrientations(window) & (UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown));
+    orient = UIKit_GetActiveInterfaceOrientation();
+    supportedOrientations = UIKit_GetSupportedOrientations(window);
+    supportsLandscape = (supportedOrientations & UIInterfaceOrientationMaskLandscape) != 0;
+    supportsPortrait = (supportedOrientations & (UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown)) != 0;
+    landscape = UIInterfaceOrientationIsLandscape(orient) || !supportsPortrait;
     fullscreen = CGRectEqualToRect(screen.bounds, frame);
+    forceOrientation = fullscreen || (landscape && !supportsPortrait) || (!landscape && !supportsLandscape);
 
     /* The orientation flip doesn't make sense when the window is smaller
-     * than the screen (iPad Split View, for example). */
-    if (fullscreen && (landscape != (frame.size.width > frame.size.height))) {
+     * than the screen (iPad Split View, for example), unless the app is locked
+     * to a single orientation axis. */
+    if (forceOrientation && (landscape != (frame.size.width > frame.size.height))) {
         float height = frame.size.width;
         frame.size.width = frame.size.height;
         frame.size.height = height;
@@ -277,6 +285,21 @@ UIWindowScene *UIKit_GetActiveWindowScene(void)
     }
 
     return nil;
+}
+
+UIInterfaceOrientation UIKit_GetActiveInterfaceOrientation(void)
+{
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        UIWindowScene *windowScene = UIKit_GetActiveWindowScene();
+        if (windowScene != nil && windowScene.interfaceOrientation != UIInterfaceOrientationUnknown) {
+            return windowScene.interfaceOrientation;
+        }
+    }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    return [UIApplication sharedApplication].statusBarOrientation;
+#pragma clang diagnostic pop
 }
 
 void UIKit_ForceUpdateHomeIndicator(void)

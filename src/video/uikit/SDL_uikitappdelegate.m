@@ -97,7 +97,7 @@ SDL_IdleTimerDisabledChanged(void *userdata, const char *name, const char *oldVa
 /* Load a launch image using the old UILaunchImageFile-era naming rules. */
 static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 {
-    UIInterfaceOrientation curorient = [UIApplication sharedApplication].statusBarOrientation;
+    UIInterfaceOrientation curorient = UIKit_GetActiveInterfaceOrientation();
     UIUserInterfaceIdiom idiom = [UIDevice currentDevice].userInterfaceIdiom;
     UIImage *image = nil;
 
@@ -234,7 +234,7 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 #endif
 
 #if !TARGET_OS_TV && !TARGET_OS_XR
-        UIInterfaceOrientation curorient = [UIApplication sharedApplication].statusBarOrientation;
+        UIInterfaceOrientation curorient = UIKit_GetActiveInterfaceOrientation();
 
         /* We always want portrait-oriented size, to match UILaunchImageSize. */
         if (screenw > screenh) {
