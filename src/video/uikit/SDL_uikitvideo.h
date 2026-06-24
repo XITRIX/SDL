@@ -40,7 +40,9 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen);
 #endif
 
 extern UIWindowScene *UIKit_GetActiveWindowScene(void) API_AVAILABLE(ios(13.0), tvos(13.0));
+#if !TARGET_OS_TV && !TARGET_OS_XR
 extern UIInterfaceOrientation UIKit_GetActiveInterfaceOrientation(void);
+#endif
 
 #endif /* __OBJC__ */
 

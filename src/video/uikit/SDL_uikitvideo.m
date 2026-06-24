@@ -287,9 +287,10 @@ UIWindowScene *UIKit_GetActiveWindowScene(void)
     return nil;
 }
 
+#if !TARGET_OS_TV && !TARGET_OS_XR
 UIInterfaceOrientation UIKit_GetActiveInterfaceOrientation(void)
 {
-    if (@available(iOS 13.0, tvOS 13.0, *)) {
+    if (@available(iOS 13.0, *)) {
         UIWindowScene *windowScene = UIKit_GetActiveWindowScene();
         if (windowScene != nil && windowScene.interfaceOrientation != UIInterfaceOrientationUnknown) {
             return windowScene.interfaceOrientation;
@@ -301,6 +302,7 @@ UIInterfaceOrientation UIKit_GetActiveInterfaceOrientation(void)
     return [UIApplication sharedApplication].statusBarOrientation;
 #pragma clang diagnostic pop
 }
+#endif
 
 void UIKit_ForceUpdateHomeIndicator(void)
 {
