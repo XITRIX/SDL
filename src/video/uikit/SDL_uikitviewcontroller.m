@@ -213,10 +213,12 @@ static void SDLCALL SDL_HideHomeIndicatorHintChanged(void *userdata, const char 
 }
 
 #ifndef SDL_PLATFORM_TVOS
+#ifndef SDL_PLATFORM_VISIONOS
 - (NSUInteger)supportedInterfaceOrientations
 {
     return UIKit_GetSupportedOrientations(window);
 }
+#endif
 
 - (BOOL)prefersStatusBarHidden
 {

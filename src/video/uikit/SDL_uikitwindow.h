@@ -38,7 +38,9 @@ extern void UIKit_UpdatePointerLock(SDL_VideoDevice *_this, SDL_Window *window);
 extern void UIKit_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window);
 extern void UIKit_GetWindowSizeInPixels(SDL_VideoDevice *_this, SDL_Window *window, int *w, int *h);
 
+#if !defined(SDL_PLATFORM_TVOS) && !defined(SDL_PLATFORM_VISIONOS)
 extern NSUInteger UIKit_GetSupportedOrientations(SDL_Window *window);
+#endif
 
 #define SDL_METALVIEW_TAG 255
 

@@ -388,7 +388,7 @@ void UIKit_GetWindowSizeInPixels(SDL_VideoDevice *_this, SDL_Window *window, int
     }
 }
 
-#ifndef SDL_PLATFORM_TVOS
+#if !defined(SDL_PLATFORM_TVOS) && !defined(SDL_PLATFORM_VISIONOS)
 NSUInteger
 UIKit_GetSupportedOrientations(SDL_Window *window)
 {
@@ -454,7 +454,7 @@ UIKit_GetSupportedOrientations(SDL_Window *window)
 
     return orientationMask;
 }
-#endif // !SDL_PLATFORM_TVOS
+#endif // !SDL_PLATFORM_TVOS && !SDL_PLATFORM_VISIONOS
 
 bool SDL_SetiOSAnimationCallback(SDL_Window *window, int interval, SDL_iOSAnimationCallback callback, void *callbackParam)
 {
