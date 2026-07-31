@@ -221,10 +221,11 @@ bool SWITCH_SetDisplayMode(SDL_VideoDevice *_this, SDL_VideoDisplay *display, SD
     SDL_GLContext ctx = SDL_GL_GetCurrentContext();
     NWindow *nWindow = nwindowGetDefault();
 
+    nwindowSetDimensions(nWindow, mode->w, mode->h);
+
     if (data != NULL && data->egl_surface != EGL_NO_SURFACE) {
         SDL_EGL_MakeCurrent(_this, NULL, NULL);
         SDL_EGL_DestroySurface(_this, data->egl_surface);
-        nwindowSetDimensions(nWindow, mode->w, mode->h);
         data->egl_surface = SDL_EGL_CreateSurface(_this, switch_window, nWindow);
         SDL_EGL_MakeCurrent(_this, data->egl_surface, ctx);
     }
@@ -242,7 +243,7 @@ static bool SWITCH_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_
         return SDL_SetError("Switch only supports one window");
     }
 
-    if (!_this->egl_data) {
+    if ((window->flags & SDL_WINDOW_OPENGL) && !_this->egl_data) {
         return SDL_SetError("EGL not initialized");
     }
 
@@ -258,9 +259,12 @@ static bool SWITCH_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_
         return SDL_SetError("Could not set NWindow dimensions: 0x%x", rc);
     }
 
-    window_data->egl_surface = SDL_EGL_CreateSurface(_this, window, nWindow);
-    if (window_data->egl_surface == EGL_NO_SURFACE) {
-        return SDL_SetError("Could not create GLES window surface");
+    window_data->egl_surface = EGL_NO_SURFACE;
+    if (window->flags & SDL_WINDOW_OPENGL) {
+        window_data->egl_surface = SDL_EGL_CreateSurface(_this, window, nWindow);
+        if (window_data->egl_surface == EGL_NO_SURFACE) {
+            return SDL_SetError("Could not create GLES window surface");
+        }
     }
 
     /* Setup driver data for this window */
@@ -318,10 +322,11 @@ static void SWITCH_SetWindowSize(SDL_VideoDevice *_this, SDL_Window *window)
     NWindow *nWindow = nwindowGetDefault();
 
     if (window->w != w || window->h != h) {
+        nwindowSetDimensions(nWindow, window->w, window->h);
+
         if (data != NULL && data->egl_surface != EGL_NO_SURFACE) {
             SDL_EGL_MakeCurrent(_this, NULL, NULL);
             SDL_EGL_DestroySurface(_this, data->egl_surface);
-            nwindowSetDimensions(nWindow, window->w, window->h);
             data->egl_surface = SDL_EGL_CreateSurface(_this, window, nWindow);
             SDL_EGL_MakeCurrent(_this, data->egl_surface, ctx);
         }
