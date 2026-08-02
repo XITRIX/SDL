@@ -31,6 +31,19 @@ static HidTouchScreenState touchState;
 static HidTouchScreenState touchStateOld;
 static SDL_TouchID touch_id = 1;
 
+static s32 SWITCH_FindFingerIndex(const HidTouchScreenState *state, u32 finger_id)
+{
+    s32 i;
+
+    for (i = 0; i < state->count; ++i) {
+        if (state->touches[i].finger_id == finger_id) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 void SWITCH_InitTouch(void)
 {
     hidInitializeTouchScreen();
@@ -49,9 +62,8 @@ void SWITCH_PollTouch(Uint64 timestamp)
 {
     const float rel_w = 1280.0f, rel_h = 720.0f;
     SDL_Window *window = SDL_GetKeyboardFocus();
-    bool found;
     SDL_TouchID id = touch_id;
-    s32 i, j;
+    s32 i;
 
     if (!window) {
         return;
@@ -61,52 +73,36 @@ void SWITCH_PollTouch(Uint64 timestamp)
 
     if (hidGetTouchScreenStates(&touchState, 1)) {
         /* Finger down */
-        if (touchStateOld.count < touchState.count) {
-            for (i = 0; i < touchState.count; i++) {
-                found = false;
-
-                for (j = 0; j < touchStateOld.count; j++) {
-                    if (touchStateOld.touches[j].finger_id == touchState.touches[i].finger_id) {
-                        found = false;
-                        break;
-                    }
-                }
-
-                if (!found) {
-                    SDL_SendTouch(timestamp, id,
-                                  (SDL_FingerID)touchState.touches[i].finger_id + 1,
-                                  window, false,
-                                  (float)touchState.touches[i].x / rel_w,
-                                  (float)touchState.touches[i].y / rel_h, 1);
-                }
+        for (i = 0; i < touchState.count; i++) {
+            if (SWITCH_FindFingerIndex(&touchStateOld, touchState.touches[i].finger_id) < 0) {
+                SDL_SendTouch(timestamp, id,
+                              (SDL_FingerID)touchState.touches[i].finger_id + 1,
+                              window, SDL_EVENT_FINGER_DOWN,
+                              (float)touchState.touches[i].x / rel_w,
+                              (float)touchState.touches[i].y / rel_h, 1);
             }
         }
 
         /* Scan for moves or up */
         for (i = 0; i < touchStateOld.count; i++) {
-            found = false;
+            s32 current_index = SWITCH_FindFingerIndex(&touchState, touchStateOld.touches[i].finger_id);
 
-            for (j = 0; j < touchState.count; j++) {
-                if (touchState.touches[j].finger_id == touchStateOld.touches[i].finger_id) {
-                    found = false;
-                    /* Finger moved */
-                    if (touchState.touches[j].x != touchStateOld.touches[i].x || touchState.touches[j].y != touchStateOld.touches[i].y) {
-                        SDL_SendTouchMotion(timestamp, id,
-                                            (SDL_FingerID)touchState.touches[j].finger_id + 1,
-                                            window,
-                                            (float)touchState.touches[j].x / rel_w,
-                                            (float)touchState.touches[j].y / rel_h, 1);
-                    }
-                    break;
+            if (current_index >= 0) {
+                /* Finger moved */
+                if (touchState.touches[current_index].x != touchStateOld.touches[i].x ||
+                    touchState.touches[current_index].y != touchStateOld.touches[i].y) {
+                    SDL_SendTouchMotion(timestamp, id,
+                                        (SDL_FingerID)touchState.touches[current_index].finger_id + 1,
+                                        window,
+                                        (float)touchState.touches[current_index].x / rel_w,
+                                        (float)touchState.touches[current_index].y / rel_h, 1);
                 }
-            }
-
-            if (!found) {
+            } else {
                 /* Finger Up */
                 SDL_SendTouch(timestamp, id,
                               (SDL_FingerID)touchStateOld.touches[i].finger_id + 1,
                               window,
-                              false,
+                              SDL_EVENT_FINGER_UP,
                               (float)touchStateOld.touches[i].x / rel_w,
                               (float)touchStateOld.touches[i].y / rel_h, 1);
             }
