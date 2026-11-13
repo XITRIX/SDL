@@ -22,6 +22,16 @@ surface path. Vulkan is opt-in with `SDL_VULKAN=ON`; Switch 1 links Mesa NVK
 Both generations retain the fork's controller, touch, keyboard, software
 keyboard, audio, lifecycle, rumble, motion and filesystem support.
 
+After configuring a native build, check the platform sources against both SDKs:
+
+```sh
+python3 build-scripts/check-switch.py --devkitpro "$DEVKITPRO" \
+    --config build/include-config-release/build_config
+```
+
+This checks native, EGL and Vulkan conditional compilation. It does not replace
+console runtime testing.
+
 ## Commercial port
 
 SDL3 runs on the Nintendo Switch! Both Switch and Switch 2 are supported. There are commercial games shipping with this port. This port is kept in a separate repository, but is available for free, under the zlib license, to anyone that is under the appropriate NDAs with Nintendo. Please contact Ryan (icculus at icculus dot org) for details.
