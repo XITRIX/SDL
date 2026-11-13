@@ -80,12 +80,14 @@ bool SWITCH_Vulkan_CreateSurface(SDL_VideoDevice *_this, SDL_Window *window, VkI
 
     // The swapchain needs the window's buffer queue to itself: a GL surface
     // made for this window (SDL_GPU claims plain windows) has to go first.
+#ifdef SDL_VIDEO_OPENGL_EGL
     if (data && data->egl_surface != EGL_NO_SURFACE) {
         SDL_EGL_MakeCurrent(_this, NULL, NULL);
         SDL_EGL_DestroySurface(_this, data->egl_surface);
         data->egl_surface = EGL_NO_SURFACE;
     }
 
+#endif
     VkViSurfaceCreateInfoNN createInfo;
     SDL_zero(createInfo);
     createInfo.sType = VK_STRUCTURE_TYPE_VI_SURFACE_CREATE_INFO_NN;

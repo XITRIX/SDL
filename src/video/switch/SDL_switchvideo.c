@@ -163,6 +163,7 @@ static SDL_VideoDevice *SWITCH_CreateDevice()
     device->Vulkan_DestroySurface = SWITCH_Vulkan_DestroySurface;
 #endif
 
+#ifdef SDL_VIDEO_OPENGL_EGL
     device->GL_LoadLibrary = SWITCH_GLES_LoadLibrary;
     device->GL_GetProcAddress = SWITCH_GLES_GetProcAddress;
     device->GL_UnloadLibrary = SWITCH_GLES_UnloadLibrary;
@@ -174,6 +175,7 @@ static SDL_VideoDevice *SWITCH_CreateDevice()
     device->GL_DestroyContext = SWITCH_GLES_DestroyContext;
     device->GL_DefaultProfileConfig = SWITCH_GLES_DefaultProfileConfig;
 
+#endif
     device->StartTextInput = SWITCH_StartTextInput;
     device->StopTextInput = SWITCH_StopTextInput;
     device->HasScreenKeyboardSupport = SWITCH_HasScreenKeyboardSupport;
@@ -200,6 +202,13 @@ bool SWITCH_VideoInit(SDL_VideoDevice *_this)
 
     SDL_zero(current_mode);
 
+#ifdef __SWITCH2__
+    u32 native_width = 1920, native_height = 1080;
+    nwindowSetModeDimensions(nwindowGetDefault(), 0, 0, 0, 0);
+    nwindowGetDimensions(nwindowGetDefault(), &native_width, &native_height);
+    current_mode.w = native_width;
+    current_mode.h = native_height;
+#else
     if (appletGetOperationMode() == AppletOperationMode_Handheld) {
         current_mode.w = 1280;
         current_mode.h = 720;
@@ -208,6 +217,7 @@ bool SWITCH_VideoInit(SDL_VideoDevice *_this)
         current_mode.h = 1080;
     }
 
+#endif
     current_mode.refresh_rate = 60.0f;
     current_mode.format = SDL_PIXELFORMAT_RGBA8888;
 
@@ -241,11 +251,13 @@ void SWITCH_VideoQuit(SDL_VideoDevice *_this)
 {
     // this should not be needed if user code is right (SDL_GL_LoadLibrary/SDL_GL_UnloadLibrary calls match)
     // this (user) error doesn't have the same effect on switch thought, as the driver needs to be unloaded (crash)
+#ifdef SDL_VIDEO_OPENGL_EGL
     if (_this->gl_config.driver_loaded > 0) {
         SWITCH_GLES_UnloadLibrary(_this);
         _this->gl_config.driver_loaded = 0;
     }
 
+#endif
     // exit touch
     SWITCH_QuitTouch();
     // exit keyboard
@@ -273,20 +285,29 @@ static bool SWITCH_GetDisplayModes(SDL_VideoDevice *_this, SDL_VideoDisplay *dis
     mode.refresh_rate = 60;
     mode.format = SDL_PIXELFORMAT_RGBA8888;
 
+#ifndef __SWITCH2__
     // 1280x720 RGBA8888
     mode.w = 1280;
     mode.h = 720;
     SDL_AddFullscreenDisplayMode(display, &mode);
+#endif
 
     // 1920x1080 RGBA8888
     mode.w = 1920;
     mode.h = 1080;
     SDL_AddFullscreenDisplayMode(display, &mode);
+#ifdef __SWITCH2__
+    if (appletGetOperationMode() == AppletOperationMode_Handheld) {
+        mode.refresh_rate = 120;
+        SDL_AddFullscreenDisplayMode(display, &mode);
+    }
+#endif
     return true;
 }
 
 bool SWITCH_SetDisplayMode(SDL_VideoDevice *_this, SDL_VideoDisplay *display, SDL_DisplayMode *mode)
 {
+#ifdef SDL_VIDEO_OPENGL_EGL
     (void)display;
 
     if (switch_window == NULL) {
@@ -300,12 +321,24 @@ bool SWITCH_SetDisplayMode(SDL_VideoDevice *_this, SDL_VideoDisplay *display, SD
     if (data != NULL && data->egl_surface != EGL_NO_SURFACE) {
         SDL_EGL_MakeCurrent(_this, NULL, NULL);
         SDL_EGL_DestroySurface(_this, data->egl_surface);
+#ifdef __SWITCH2__
+        nwindowSetModeDimensions(nWindow, 0, 0, 0, 0);
+#else
         nwindowSetDimensions(nWindow, mode->w, mode->h);
+#endif
         data->egl_surface = SDL_EGL_CreateSurface(_this, switch_window, nWindow);
         SDL_EGL_MakeCurrent(_this, data->egl_surface, ctx);
     }
 
     return true;
+#else
+#ifdef __SWITCH2__
+    nwindowSetModeDimensions(nwindowGetDefault(), 0, 0, 0, 0);
+#else
+    nwindowSetDimensions(nwindowGetDefault(), mode->w, mode->h);
+#endif
+    return true;
+#endif
 }
 
 static bool SWITCH_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID create_props)
@@ -318,10 +351,15 @@ static bool SWITCH_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_
         return SDL_SetError("Switch only supports one window");
     }
 
-    if (!_this->egl_data) {
+    // SDL_SWITCH_NATIVE_WINDOW=1: the app presents to nwindowGetDefault() itself
+    // (deko3d, NVN): no EGL surface may hold the window's buffers.
+    const bool native = SDL_GetHintBoolean("SDL_SWITCH_NATIVE_WINDOW", false);
+#ifdef SDL_VIDEO_OPENGL_EGL
+    if (!_this->egl_data && !native && !(window->flags & SDL_WINDOW_VULKAN)) {
         return SDL_SetError("EGL not initialized");
     }
 
+#endif
     window_data = (SDL_WindowData *)SDL_calloc(1, sizeof(SDL_WindowData));
     if (window_data == NULL) {
         return SDL_OutOfMemory();
@@ -329,18 +367,29 @@ static bool SWITCH_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_
 
     nWindow = nwindowGetDefault();
 
+#ifdef __SWITCH2__
+    rc = nwindowSetModeDimensions(nWindow, 0, 0, 0, 0);
+    u32 native_width = window->w, native_height = window->h;
+    if (R_SUCCEEDED(rc)) rc = nwindowGetDimensions(nWindow, &native_width, &native_height);
+    window->w = native_width; window->h = native_height;
+#else
     rc = nwindowSetDimensions(nWindow, window->w, window->h);
+#endif
     if (R_FAILED(rc)) {
         return SDL_SetError("Could not set NWindow dimensions: 0x%x", rc);
     }
 
-    if (window->flags & SDL_WINDOW_VULKAN) {
-        // the Vulkan swapchain configures the window's buffers itself
+#ifdef SDL_VIDEO_OPENGL_EGL
+    if ((window->flags & SDL_WINDOW_VULKAN) || native) {
+        // the Vulkan swapchain (or the app) configures the window's buffers itself
         window_data->egl_surface = EGL_NO_SURFACE;
     } else if ((window_data->egl_surface = SDL_EGL_CreateSurface(_this, window, nWindow)) == EGL_NO_SURFACE) {
         return SDL_SetError("Could not create GLES window surface");
     }
 
+#else
+    window_data->egl_surface = EGL_NO_SURFACE;
+#endif
     /* Setup driver data for this window */
     window->internal = window_data;
     switch_window = window;
@@ -362,11 +411,13 @@ static void SWITCH_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window)
 
     if (window == switch_window) {
         if (data != NULL) {
+#ifdef SDL_VIDEO_OPENGL_EGL
             if (data->egl_surface != EGL_NO_SURFACE) {
                 SDL_EGL_MakeCurrent(_this, NULL, NULL);
                 SDL_EGL_DestroySurface(_this, data->egl_surface);
             }
 
+#endif
             SDL_free(window->internal);
             window->internal = NULL;
         }
@@ -390,20 +441,36 @@ static bool SWITCH_SetWindowPosition(SDL_VideoDevice *_this, SDL_Window *window)
 
 static void SWITCH_SetWindowSize(SDL_VideoDevice *_this, SDL_Window *window)
 {
+#ifdef SDL_VIDEO_OPENGL_EGL
     u32 w = 0, h = 0;
     SDL_WindowData *data = (SDL_WindowData *)window->internal;
     SDL_GLContext ctx = SDL_GL_GetCurrentContext();
     NWindow *nWindow = nwindowGetDefault();
+    nwindowGetDimensions(nWindow, &w, &h);
 
-    if (window->w != w || window->h != h) {
+    if (data != NULL && (window->w != w || window->h != h || data->egl_surface != EGL_NO_SURFACE)) {
         if (data != NULL && data->egl_surface != EGL_NO_SURFACE) {
             SDL_EGL_MakeCurrent(_this, NULL, NULL);
             SDL_EGL_DestroySurface(_this, data->egl_surface);
+#ifdef __SWITCH2__
+            nwindowSetModeDimensions(nWindow, 0, 0, 0, 0);
+#else
             nwindowSetDimensions(nWindow, window->w, window->h);
+#endif
             data->egl_surface = SDL_EGL_CreateSurface(_this, window, nWindow);
             SDL_EGL_MakeCurrent(_this, data->egl_surface, ctx);
+#ifdef __SWITCH2__
+            nwindowSetFrameRates(nWindow, 120, 60, true);
+#endif
         }
     }
+#else
+#ifdef __SWITCH2__
+    nwindowSetModeDimensions(nwindowGetDefault(), 0, 0, 0, 0);
+#else
+    nwindowSetDimensions(nwindowGetDefault(), window->w, window->h);
+#endif
+#endif
 }
 
 static void SWITCH_ShowWindow(SDL_VideoDevice *_this, SDL_Window *window)
@@ -455,6 +522,16 @@ static void SWITCH_PumpEvents(SDL_VideoDevice *_this)
     // note that SDL_WINDOW_RESIZABLE is only possible in windowed mode,
     // so we don't care about current fullscreen/windowed status
     if (switch_window != NULL && switch_window->flags & SDL_WINDOW_RESIZABLE) {
+#ifdef __SWITCH2__
+        // libounce follows both dock/undock and AM's TV-resolution event.
+        // Resize the EGL surface and emit SDL pixel-size events on either.
+        u32 width = 0, height = 0;
+        if (R_SUCCEEDED(nwindowGetDimensions(nwindowGetDefault(), &width, &height)) &&
+            width && height && (switch_window->w != (int)width || switch_window->h != (int)height)) {
+            SDL_Log("Switch 2 output resized to %ux%u", width, height);
+            SDL_SetWindowSize(switch_window, width, height);
+        }
+#else
         om = appletGetOperationMode();
         if (om != operationMode) {
             operationMode = om;
@@ -464,6 +541,7 @@ static void SWITCH_PumpEvents(SDL_VideoDevice *_this)
                 SDL_SetWindowSize(switch_window, 1920, 1080);
             }
         }
+#endif
     }
 }
 

@@ -27,7 +27,12 @@
 
 #include <switch.h>
 
+#ifdef SDL_VIDEO_OPENGL_EGL
 #include "../SDL_egl_c.h"
+#else
+typedef void* EGLSurface;
+#define EGL_NO_SURFACE NULL
+#endif
 
 typedef struct SDL_WindowData
 {

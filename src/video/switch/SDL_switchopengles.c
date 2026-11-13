@@ -22,7 +22,7 @@
 #include "SDL_internal.h"
 #include "../../SDL_log_c.h"
 
-#if SDL_VIDEO_DRIVER_SWITCH
+#if defined(SDL_VIDEO_DRIVER_SWITCH) && defined(SDL_VIDEO_OPENGL_EGL)
 
 #include "SDL_switchopengles.h"
 #include "SDL_switchvideo.h"
